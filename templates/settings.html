@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}设置 · 科技早报{% endblock %}
+{% block content %}
+<section class="mast">
+  <p class="eyebrow">偏好</p>
+  <h1>决定早报里出现什么</h1>
+  <p class="lede">兴趣、来源和推送时间保存在本地数据库。邮箱、机器人令牌这些密钥只放在环境变量里，页面上看不到原文。</p>
+</section>
+
+{% if not password_set %}
+<p class="banner">还没有设置 ADMIN_PASSWORD。任何能打开这个服务的人都可以改设置。放到公网之前请先配上密码。</p>
+{% elif protect_site %}
+<p class="banner quiet">整站已要求登录后才能浏览。</p>
+{% endif %}
+
+{% if errors %}
+<div class="form-error" role="alert">
+  {% for error in errors %}<p>{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/settings" class="settings">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <fieldset>
+    <legend>兴趣</legend>
+    <label>
+      <span>关键词和权重</span>
+      <textarea name="keywords" rows="6" placeholder="Rust:2&#10;LLM:1.5&#10;开源">{{ fields.keywords }}</textarea>
+      <small>每行一个。写成「关键词:权重」，权重越大越靠前，范围 -5 到 20。留空就只按来源热度排序。英文按词匹配，中文按包含匹配。</small>
+    </label>
+    <label>
+      <span>屏蔽词</span>
+      <textarea name="blocked" rows="4" placeholder="招聘&#10;广告">{{ fields.blocked }}</textarea>
+      <small>标题或摘要命中后，这条内容不会出现在页面上，也不会进早报。</small>
+    </label>
+    <label>
+      <span>编程语言</span>
+      <input name="languages" value="{{ fields.languages }}" placeholder="Python, Go, Rust">
+      <small>用逗号或换行分隔，最多 6 个。会用来抓对应的 GitHub Trending，并给语言相符的仓库加一点分。留空则抓全语言日榜。</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>来源</legend>
+    <div class="checks">
+      {% for source in catalog %}
+      <label class="check">
+        <input type="checkbox" name="sources" value="{{ source.id }}" {% if source.id in fields.sources %}checked{% endif %}>
+        <span>
+          <strong>{{ source.label }}</strong>
+          <small>{{ source.description }}</small>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+    <label>
+      <span>自定义 RSS / Atom</span>
+      <textarea name="rss_feeds" rows="5" placeholder="InfoQ 中文|https://www.infoq.cn/feed">{{ fields.rss_feeds }}</textarea>
+      <small>每行「名称|地址」。只写地址也可以。行首加 ! 表示先记下但这次不抓。需要同时勾选上面的「自定义 RSS」。</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>早报</legend>
+    <div class="grid">
+      <label>
+        <span>每期条数</span>
+        <input name="items_per_digest" type="number" min="1" max="50" required value="{{ fields.items_per_digest }}">
+      </label>
+      <label>
+        <span>时间窗口（小时）</span>
+        <input name="digest_window_hours" type="number" min="6" max="168" required value="{{ fields.digest_window_hours }}">
+      </label>
+      <label>
+        <span>小时</span>
+        <input name="digest_hour" type="number" min="0" max="23" required value="{{ fields.digest_hour }}">
+      </label>
+      <label>
+        <span>分钟</span>
+        <input name="digest_minute" type="number" min="0" max="59" required value="{{ fields.digest_minute }}">
+      </label>
+    </div>
+    <label>
+      <span>时区</span>
+      <select name="timezone">
+        {% for zone in timezones %}
+        <option value="{{ zone }}" {% if zone == fields.timezone %}selected{% endif %}>{{ zone }}</option>
+        {% endfor %}
+      </select>
+      <small>默认每天 08:00（Asia/Shanghai）。服务进程要一直开着，内置调度才会响。也可以关掉调度，改用系统 cron 调用命令行。</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>推送渠道</legend>
+    <div class="checks">
+      {% for channel in channels %}
+      <label class="check">
+        <input type="checkbox" name="channels" value="{{ channel.id }}" {% if channel.id in fields.channels %}checked{% endif %}>
+        <span>
+          <strong>{{ channel.label }}</strong>
+          <small>{{ channel.hint }} · {% if channel.configured %}环境变量已就绪{% else %}环境变量还没配{% endif %}</small>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" name="action" value="save">保存设置</button>
+    <button type="submit" name="action" value="fetch" class="secondary">保存并立即抓取</button>
+    <button type="submit" name="action" value="test" class="secondary">保存并发送测试早报</button>
+  </div>
+  <p class="fine">抓取会逐个访问来源，通常十几秒。测试早报使用刚刚保存的偏好，只发给已勾选且环境变量齐全的渠道。</p>
+</form>
+
+{% if password_set %}
+<form method="post" action="/logout" class="logout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button type="submit" class="ghost">退出登录</button>
+</form>
+{% endif %}
+
+{% if fetch_run %}
+<section class="panel">
+  <h2>最近一次抓取</h2>
+  <p>{{ fetch_run.finished_label }} · 新增 {{ fetch_run.inserted }} · 更新 {{ fetch_run.updated }}</p>
+  {% if fetch_run.sources %}
+  <ul class="report">
+    {% for source in fetch_run.sources %}
+    <li class="{% if not source.ok %}bad{% endif %}">{{ source.label }} · {{ source.count }} 条{% if source.error %} · {{ source.error }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if last_push %}
+<section class="panel">
+  <h2>最近一次推送</h2>
+  <p>{{ last_push.when }} · {{ last_push.summary }}</p>
+</section>
+{% endif %}
+{% endblock %}

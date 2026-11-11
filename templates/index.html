@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}今日 · 科技早报{% endblock %}
+{% block content %}
+<section class="mast">
+  <p class="eyebrow">{{ date_label }}</p>
+  <h1>今天值得看的技术内容</h1>
+  <p class="lede">
+    {% if rows %}按你的兴趣排了 {{ rows|length }} 条{% if truncated %}，这里只显示前 200 条{% endif %}。{% else %}这个范围里还没有可显示的内容。{% endif %}
+    {% if fetch_run %}上次抓取 {{ fetch_run.finished_label }}，新增 {{ fetch_run.inserted }} 条。{% endif %}
+  </p>
+</section>
+
+<div class="toolbar">
+  <div class="windows" role="tablist">
+    {% for item in windows %}
+    <a href="{{ item.href }}" class="{% if item.on %}on{% endif %}" {% if item.on %}aria-current="page"{% endif %}>{{ item.label }}</a>
+    {% endfor %}
+  </div>
+  <form class="filters" method="get" action="/">
+    <input type="hidden" name="window" value="{{ window }}">
+    {% if topic %}<input type="hidden" name="topic" value="{{ topic }}">{% endif %}
+    <label>
+      <span>来源</span>
+      <select name="source">
+        <option value="">全部</option>
+        {% for option in source_options %}
+        <option value="{{ option.id }}" {% if option.id == source %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="grow">
+      <span>搜索</span>
+      <input type="search" name="q" value="{{ query }}" placeholder="标题或摘要">
+    </label>
+    <button type="submit">筛选</button>
+  </form>
+</div>
+
+{% if topic_links %}
+<div class="chips">
+  {% for chip in topic_links %}
+  <a class="chip {% if chip.on %}on{% endif %}" href="{{ chip.href }}">{{ chip.text }}</a>
+  {% endfor %}
+  {% if source or topic or query %}
+  <a class="chip quiet" href="{{ clear_href }}">清除筛选</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if rows %}
+<ol class="feed">
+  {% for row in rows %}
+  <li>
+    <div class="score {% if row.hot %}hot{% endif %}" title="{{ row.breakdown }}">{{ row.score }}</div>
+    <div>
+      {% if row.url %}
+      <a class="title" href="{{ row.url }}" target="_blank" rel="noopener noreferrer">{{ row.title }}</a>
+      {% else %}
+      <p class="title">{{ row.title }}</p>
+      {% endif %}
+      <p class="meta">
+        <span class="badge">{{ row.source_label }}</span>
+        {% if row.language %}<span>{{ row.language }}</span>{% endif %}
+        <span>热度 {{ row.popularity }}</span>
+        <span>{{ row.time_label }}</span>
+        {% for name in row.matched %}<span class="chip tiny">{{ name }}</span>{% endfor %}
+      </p>
+      {% if row.summary %}<p class="summary">{{ row.summary }}</p>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+<details class="help">
+  <summary>分数是怎么来的</summary>
+  <p>命中的关键词按权重乘 100，编程语言相符再加 3 分，最后加上来源热度的自然对数。没有配置关键词时，排序基本只看热度。把鼠标放在分数上可以看到拆分。</p>
+</details>
+{% else %}
+<div class="empty">
+  {% if has_any %}
+  <p>没有符合当前筛选的内容。</p>
+  <a class="button" href="{{ clear_href }}">看全部</a>
+  {% else %}
+  <p>还没有抓取过。到设置页跑一次，或者在服务器上执行 <code>python -m app.cli fetch</code>。</p>
+  <a class="button" href="/settings">打开设置</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
