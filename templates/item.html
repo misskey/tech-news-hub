@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{% if missing %}没有这条{% else %}{{ title }}{% endif %} · 科技早报{% endblock %}
+{% block content %}
+{% if missing %}
+<section class="narrow">
+  <h1>没有这条内容</h1>
+  <p class="lede">它可能已经被清掉了。</p>
+  <a class="button" href="/">回到今日</a>
+</section>
+{% else %}
+<article class="story">
+  <p class="eyebrow">{{ source_label }}{% if time_label %} · {{ time_label }}{% endif %}</p>
+  <h1>{{ title }}</h1>
+  <p class="meta">
+    {% if score %}<span>得分 {{ score }}</span>{% endif %}
+    {% if language %}<span>{{ language }}</span>{% endif %}
+    <span class="chip tiny">{{ summary_label }}</span>
+    {% for name in matched %}<span class="chip tiny">{{ name }}</span>{% endfor %}
+  </p>
+  {% if blurb %}<p class="lede">{{ blurb }}</p>{% endif %}
+  {% if detail and detail != blurb %}<p class="detail">{{ detail }}</p>{% endif %}
+  {% if takeaways %}
+  <h2>提到的技术</h2>
+  <p class="meta">
+    {% for name in takeaways %}<span class="chip tiny">{{ name }}</span>{% endfor %}
+  </p>
+  {% endif %}
+  {% if original %}
+  <h2>原文摘录</h2>
+  <p class="original">{{ original }}</p>
+  {% endif %}
+  {% if url %}<a class="button" href="{{ url }}" target="_blank" rel="noopener noreferrer">打开原文</a>{% endif %}
+</article>
+{% endif %}
+{% endblock %}

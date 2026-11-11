@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}科技早报{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%239f2a1f'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23fffdf8' font-family='serif'%3E早%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">
+      <span class="mark" aria-hidden="true">早</span>
+      <span>科技早报</span>
+    </a>
+    <nav>
+      <a href="/">今日</a>
+      <a href="/settings">设置</a>
+    </nav>
+  </header>
+  {% if flash %}
+  <div class="flash flash-{{ flash.level }}" role="status">{{ flash.text }}</div>
+  {% endif %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    <p>条目保存在这台机器的 SQLite 里。推送密钥只从环境变量读取。</p>
+  </footer>
+</body>
+</html>

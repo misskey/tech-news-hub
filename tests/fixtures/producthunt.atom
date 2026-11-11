@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xml:lang="en-US" xmlns="http://www.w3.org/2005/Atom">
+<entry>
+    <id>tag:www.producthunt.com,2005:Post/1308685</id>
+    <published>2026-11-08T03:17:04-08:00</published>
+    <updated>2026-11-11T00:53:12-08:00</updated>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/products/kippy-ai"/>
+    <title>Kippy AI</title>
+    <content type="html">          &lt;p&gt;
+            Learn languages while having fun!
+          &lt;/p&gt;
+          &lt;p&gt;
+            &lt;a href="https://www.producthunt.com/products/kippy-ai?utm_campaign=producthunt-atom-posts-feed&amp;amp;utm_medium=rss-feed&amp;amp;utm_source=producthunt-atom-posts-feed"&gt;Discussion&lt;/a&gt;
+            |
+            &lt;a href="https://www.producthunt.com/r/p/1308685?app_id=339"&gt;Link&lt;/a&gt;
+          &lt;/p&gt;
+</content>
+    <author>
+      <name>Steve Olesansky</name>
+    </author>
+  </entry>
+<entry>
+    <id>tag:www.producthunt.com,2005:Post/1296277</id>
+    <published>2026-10-28T11:49:25-07:00</published>
+    <updated>2026-11-11T00:53:12-08:00</updated>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/products/call-e"/>
+    <title>CALL-E</title>
+    <content type="html">          &lt;p&gt;
+            The phone line for AI agents
+          &lt;/p&gt;
+          &lt;p&gt;
+            &lt;a href="https://www.producthunt.com/products/call-e?utm_campaign=producthunt-atom-posts-feed&amp;amp;utm_medium=rss-feed&amp;amp;utm_source=producthunt-atom-posts-feed"&gt;Discussion&lt;/a&gt;
+            |
+            &lt;a href="https://www.producthunt.com/r/p/1296277?app_id=339"&gt;Link&lt;/a&gt;
+          &lt;/p&gt;
+</content>
+    <author>
+      <name>Ben Lang</name>
+    </author>
+  </entry>
+</feed>
