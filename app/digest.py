@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from app.models import NewsItem, Preferences
+from app.models import Briefing, ItemSummary, NewsItem, Preferences
 from app.ranking import rank_items
 from app.sources import source_label
 
@@ -30,6 +30,8 @@ class Digest:
     generated_at: datetime
     entries: list[DigestEntry] = field(default_factory=list)
     window_hours: int = 36
+    overview: str = ""
+    highlights: list[str] = field(default_factory=list)
 
 
 def build_digest(
@@ -37,35 +39,43 @@ def build_digest(
     prefs: Preferences,
     *,
     now: datetime | None = None,
+    summaries: dict[tuple[str, str], ItemSummary] | None = None,
+    briefing: Briefing | None = None,
 ) -> Digest:
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
     local = moment.astimezone(ZoneInfo(prefs.timezone))
     ranked = rank_items(items, prefs, limit=prefs.items_per_digest)
-    entries = [
-        DigestEntry(
-            title=item.item.title,
-            url=item.item.url,
-            source_label=source_label(item.item),
-            score=item.score,
-            summary=_brief(item.item.summary),
-            matched=list(item.matched),
-            popularity=item.item.popularity,
-            language=item.item.language,
+    lookup = summaries or {}
+    entries = []
+    for item in ranked:
+        found = lookup.get((item.item.source, item.item.external_id))
+        entries.append(
+            DigestEntry(
+                title=item.item.title,
+                url=item.item.url,
+                source_label=source_label(item.item),
+                score=item.score,
+                summary=found.short if found else _brief(item.item.summary),
+                matched=list(item.matched),
+                popularity=item.item.popularity,
+                language=item.item.language,
+            )
         )
-        for item in ranked
-    ]
     return Digest(
         title=f"科技早报 {local.strftime('%Y-%m-%d')}",
         generated_at=moment,
         entries=entries,
         window_hours=prefs.digest_window_hours,
+        overview=briefing.overview if briefing else "",
+        highlights=list(briefing.highlights) if briefing else [],
     )
 
 
 def render_markdown(digest: Digest) -> str:
     lines = [f"## {digest.title}", ""]
+    lines.extend(_briefing_lines(digest))
     if not digest.entries:
         lines.append("这个时间窗口里没有可推送的内容。")
         lines.append("")
@@ -81,6 +91,7 @@ def render_markdown(digest: Digest) -> str:
 
 def render_plain(digest: Digest) -> str:
     lines = [digest.title, ""]
+    lines.extend(_briefing_lines(digest, markdown=False))
     if not digest.entries:
         lines.append("这个时间窗口里没有可推送的内容。")
     for index, entry in enumerate(digest.entries, 1):
@@ -98,6 +109,7 @@ def render_html(digest: Digest) -> str:
     rows = [
         "<!DOCTYPE html><html><body style=\"font-family:sans-serif;color:#1c1915\">",
         f"<h2>{html.escape(digest.title)}</h2>",
+        _briefing_html(digest),
         "<ol>",
     ]
     for entry in digest.entries:
@@ -119,10 +131,10 @@ def render_html(digest: Digest) -> str:
 
 def telegram_messages(digest: Digest) -> list[str]:
     header = f"<b>{html.escape(digest.title)}</b>"
-    if not digest.entries:
+    if not digest.entries and not digest.overview:
         return [header + "\n\n这个时间窗口里没有可推送的内容。"]
     messages: list[str] = []
-    current = header + "\n"
+    current = header + "\n" + _briefing_telegram(digest)
     for index, entry in enumerate(digest.entries, 1):
         block = (
             f'{index}. <a href="{html.escape(entry.url, quote=True)}">{html.escape(entry.title)}</a>\n'
@@ -139,6 +151,44 @@ def telegram_messages(digest: Digest) -> list[str]:
     if current.strip():
         messages.append(current.strip())
     return messages
+
+
+def _briefing_lines(digest: Digest, markdown: bool = True) -> list[str]:
+    if not digest.overview and not digest.highlights:
+        return []
+    lines = []
+    if digest.overview:
+        lines.extend([digest.overview, ""])
+    if digest.highlights:
+        lines.append("### 今日新技术看点" if markdown else "今日新技术看点")
+        lines.extend(f"- {item}" for item in digest.highlights)
+        lines.append("")
+    return lines
+
+
+def _briefing_html(digest: Digest) -> str:
+    if not digest.overview and not digest.highlights:
+        return ""
+    parts = []
+    if digest.overview:
+        parts.append(f"<p>{html.escape(digest.overview)}</p>")
+    if digest.highlights:
+        parts.append("<p><strong>今日新技术看点</strong></p><ul>")
+        parts.extend(f"<li>{html.escape(item)}</li>" for item in digest.highlights)
+        parts.append("</ul>")
+    return "".join(parts)
+
+
+def _briefing_telegram(digest: Digest) -> str:
+    if not digest.overview and not digest.highlights:
+        return ""
+    lines = []
+    if digest.overview:
+        lines.append(html.escape(digest.overview))
+    if digest.highlights:
+        lines.append("<b>今日新技术看点</b>")
+        lines.extend(f"• {html.escape(item)}" for item in digest.highlights)
+    return "\n".join(lines) + "\n"
 
 
 def _meta(entry: DigestEntry) -> list[str]:

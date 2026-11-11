@@ -29,6 +29,8 @@ def default_preferences() -> Preferences:
         timezone=DEFAULT_TIMEZONE,
         channels={channel_id: False for channel_id in CHANNEL_IDS},
         digest_window_hours=36,
+        llm_summaries=True,
+        llm_model="",
     )
 
 
@@ -138,6 +140,8 @@ def preferences_from_dict(data: dict | None) -> Preferences:
         timezone=_valid_timezone(str(data.get("timezone") or DEFAULT_TIMEZONE)),
         channels=channels,
         digest_window_hours=_clamp_int(data.get("digest_window_hours"), 36, 6, 168),
+        llm_summaries=bool(data.get("llm_summaries", True)),
+        llm_model=str(data.get("llm_model") or "").strip()[:80],
     )
 
 
@@ -181,6 +185,10 @@ def parse_preferences(data: dict) -> tuple[Preferences | None, list[str]]:
         errors.append("时区无效")
 
     channels = {channel_id: channel_id in (data.get("channels") or []) for channel_id in CHANNEL_IDS}
+    llm_summaries = str(data.get("llm_summaries") or "").lower() in {"1", "on", "true", "yes"}
+    llm_model = str(data.get("llm_model") or "").strip()[:80]
+    if llm_model and not re.fullmatch(r"[A-Za-z0-9_.:/\-]+", llm_model):
+        errors.append("模型名称只能包含字母、数字和 . _ - / :")
     if errors:
         return None, errors
     return (
@@ -196,6 +204,8 @@ def parse_preferences(data: dict) -> tuple[Preferences | None, list[str]]:
             timezone=timezone,
             channels=channels,
             digest_window_hours=window or 36,
+            llm_summaries=llm_summaries,
+            llm_model=llm_model,
         ),
         [],
     )

@@ -24,9 +24,10 @@ from app.prefs import (
     format_languages,
     parse_preferences,
 )
-from app.ranking import keyword_in, rank_items
+from app.ranking import keyword_in, rank_items, score_item
 from app.scheduler import reschedule
 from app.sources import CATALOG, source_label
+from app.summary import ensure_briefing, ensure_summaries
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +79,15 @@ def register(app: FastAPI, templates: Jinja2Templates) -> None:
             since = now_local - timedelta(days=3)
         else:
             since = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        scored = rank_items(db.items_since(since.astimezone(timezone.utc)), prefs)
+        day_scored = rank_items(db.items_since(since.astimezone(timezone.utc)), prefs)
         source_options = []
         seen = set()
-        for item in scored:
+        for item in day_scored:
             if item.item.source in seen:
                 continue
             seen.add(item.item.source)
             source_options.append({"id": item.item.source, "label": source_label(item.item)})
+        scored = day_scored
         if source:
             scored = [item for item in scored if item.item.source == source]
         if topic:
@@ -102,7 +104,26 @@ def register(app: FastAPI, templates: Jinja2Templates) -> None:
                 if needle in f"{item.item.title}\n{item.item.summary}".casefold()
             ]
         truncated = len(scored) > 200
-        rows = [_row(item, zone) for item in scored[:200]]
+        visible = scored[:200]
+        summaries = ensure_summaries(
+            db,
+            [item.item for item in day_scored[:12] + visible],
+            prefs,
+            settings,
+            allow_llm=False,
+        )
+        briefing = None
+        if day_scored:
+            briefing = ensure_briefing(
+                db,
+                day_scored,
+                summaries,
+                prefs,
+                settings,
+                now=datetime.now(timezone.utc),
+                allow_llm=False,
+            )
+        rows = [_row(item, zone, summaries.get((item.item.source, item.item.external_id))) for item in visible]
 
         def href(**updates: str) -> str:
             params = {"window": window, "source": source, "topic": topic, "q": query}
@@ -143,6 +164,44 @@ def register(app: FastAPI, templates: Jinja2Templates) -> None:
                 "has_any": db.count_items() > 0,
                 "fetch_run": fetch_run,
                 "password_set": bool(settings.admin_password),
+                "briefing": briefing,
+            },
+        )
+
+    @app.get("/items/{item_id}")
+    def item_page(request: Request, item_id: int):
+        settings = request.app.state.settings
+        denied = _guard_site(request, settings)
+        if denied is not None:
+            return denied
+        db = request.app.state.db
+        item = db.get_item(item_id)
+        if item is None:
+            return _render(templates, request, "item.html", {"missing": True}, status_code=404)
+        prefs = db.get_preferences()
+        summaries = ensure_summaries(db, [item], prefs, settings, allow_llm=False)
+        summary = summaries.get((item.source, item.external_id))
+        scored = score_item(item, prefs)
+        zone = ZoneInfo(prefs.timezone)
+        moment = item.published_at or item.first_seen_at
+        return _render(
+            templates,
+            request,
+            "item.html",
+            {
+                "missing": False,
+                "title": item.title,
+                "url": item.url if item.url.startswith(("http://", "https://")) else "",
+                "source_label": source_label(item),
+                "language": item.language,
+                "time_label": moment.astimezone(zone).strftime("%Y-%m-%d %H:%M") if moment else "",
+                "score": f"{scored.score:.1f}" if scored else "",
+                "matched": scored.matched if scored else [],
+                "blurb": summary.short if summary else item.summary,
+                "detail": summary.long if summary else item.summary,
+                "takeaways": summary.takeaways if summary else [],
+                "original": item.summary,
+                "summary_label": "摘要" if summary and summary.provider == "llm" else "摘录",
             },
         )
 
@@ -272,6 +331,8 @@ def _settings_context(request: Request, draft: dict | None = None, errors: list[
         "protect_site": settings.protect_site,
         "fetch_run": _present_fetch_run(db.latest_fetch_run(), zone),
         "last_push": _present_push(db.last_push(), zone),
+        "llm_ready": bool(settings.openai_api_key),
+        "llm_model_default": settings.openai_model,
     }
 
 
@@ -288,6 +349,8 @@ def _fields_from_prefs(prefs: Preferences) -> dict:
         "digest_minute": prefs.digest_minute,
         "timezone": prefs.timezone,
         "digest_window_hours": prefs.digest_window_hours,
+        "llm_summaries": prefs.llm_summaries,
+        "llm_model": prefs.llm_model,
     }
 
 
@@ -304,10 +367,12 @@ def _draft_from_form(form) -> dict:
         "digest_minute": str(form.get("digest_minute") or ""),
         "timezone": str(form.get("timezone") or ""),
         "digest_window_hours": str(form.get("digest_window_hours") or ""),
+        "llm_summaries": str(form.get("llm_summaries") or "").lower() in {"1", "on", "true", "yes"},
+        "llm_model": str(form.get("llm_model") or ""),
     }
 
 
-def _row(scored, zone: ZoneInfo) -> dict:
+def _row(scored, zone: ZoneInfo, summary=None) -> dict:
     item = scored.item
     moment = item.published_at or item.first_seen_at
     parts = []
@@ -316,6 +381,11 @@ def _row(scored, zone: ZoneInfo) -> dict:
     if scored.language_score:
         parts.append(f"语言 +{scored.language_score:.0f}")
     parts.append(f"热度 {scored.popularity_score:.1f}")
+    blurb = summary.short if summary else item.summary
+    detail = summary.long if summary else ""
+    if detail == blurb:
+        detail = ""
+    original = item.summary if item.summary and item.summary not in {blurb, detail} else ""
     return {
         "title": item.title,
         "url": item.url if item.url.startswith(("http://", "https://")) else "",
@@ -323,7 +393,12 @@ def _row(scored, zone: ZoneInfo) -> dict:
         "score": f"{scored.score:.1f}",
         "breakdown": " · ".join(parts),
         "popularity": f"{int(round(item.popularity)):,}",
-        "summary": item.summary,
+        "blurb": blurb,
+        "detail": detail,
+        "takeaways": summary.takeaways if summary else [],
+        "original": original,
+        "summary_label": "摘要" if summary and summary.provider == "llm" else "摘录",
+        "detail_href": f"/items/{item.id}" if item.id else "",
         "matched": scored.matched,
         "language": item.language,
         "time_label": moment.astimezone(zone).strftime("%m-%d %H:%M") if moment else "刚刚收录",

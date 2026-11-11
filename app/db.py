@@ -88,6 +88,29 @@ class Database:
                     finished_at TEXT NOT NULL,
                     report_json TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS summaries (
+                    source TEXT NOT NULL,
+                    external_id TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    short TEXT NOT NULL,
+                    long TEXT NOT NULL,
+                    takeaways_json TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (source, external_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS briefings (
+                    day TEXT PRIMARY KEY,
+                    fingerprint TEXT NOT NULL,
+                    overview TEXT NOT NULL,
+                    highlights_json TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -252,6 +275,129 @@ class Database:
         except json.JSONDecodeError:
             return None
         return data if isinstance(data, dict) else None
+
+    def get_item(self, item_id: int) -> NewsItem | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        return None if row is None else _row_to_item(row)
+
+    def load_summaries(self, keys: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
+        if not keys:
+            return {}
+        found: dict[tuple[str, str], dict] = {}
+        with self.connect() as connection:
+            for source, external_id in keys:
+                row = connection.execute(
+                    """
+                    SELECT content_hash, short, long, takeaways_json, provider, model
+                    FROM summaries WHERE source = ? AND external_id = ?
+                    """,
+                    (source, external_id),
+                ).fetchone()
+                if row is None:
+                    continue
+                try:
+                    takeaways = json.loads(row["takeaways_json"] or "[]")
+                except json.JSONDecodeError:
+                    takeaways = []
+                if not isinstance(takeaways, list):
+                    takeaways = []
+                found[(source, external_id)] = {
+                    "content_hash": row["content_hash"],
+                    "short": row["short"],
+                    "long": row["long"],
+                    "takeaways": [str(item) for item in takeaways],
+                    "provider": row["provider"],
+                    "model": row["model"] or "",
+                }
+        return found
+
+    def save_summaries(self, summaries: dict, hashes: dict[tuple[str, str], str]) -> None:
+        if not summaries:
+            return
+        now = to_iso(datetime.now(timezone.utc))
+        with self.connect() as connection:
+            for key, summary in summaries.items():
+                source, external_id = key
+                connection.execute(
+                    """
+                    INSERT INTO summaries (
+                        source, external_id, content_hash, short, long, takeaways_json,
+                        provider, model, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(source, external_id) DO UPDATE SET
+                        content_hash = excluded.content_hash,
+                        short = excluded.short,
+                        long = excluded.long,
+                        takeaways_json = excluded.takeaways_json,
+                        provider = excluded.provider,
+                        model = excluded.model,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        source,
+                        external_id,
+                        hashes.get(key, ""),
+                        summary.short,
+                        summary.long,
+                        json.dumps(summary.takeaways, ensure_ascii=False),
+                        summary.provider,
+                        summary.model,
+                        now,
+                    ),
+                )
+
+    def load_briefing(self, day: str) -> dict | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT fingerprint, overview, highlights_json, provider, model
+                FROM briefings WHERE day = ?
+                """,
+                (day,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            highlights = json.loads(row["highlights_json"] or "[]")
+        except json.JSONDecodeError:
+            highlights = []
+        if not isinstance(highlights, list):
+            highlights = []
+        return {
+            "fingerprint": row["fingerprint"],
+            "overview": row["overview"],
+            "highlights": [str(item) for item in highlights],
+            "provider": row["provider"],
+            "model": row["model"] or "",
+        }
+
+    def save_briefing(self, day: str, fingerprint: str, briefing) -> None:
+        now = to_iso(datetime.now(timezone.utc))
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO briefings (
+                    day, fingerprint, overview, highlights_json, provider, model, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(day) DO UPDATE SET
+                    fingerprint = excluded.fingerprint,
+                    overview = excluded.overview,
+                    highlights_json = excluded.highlights_json,
+                    provider = excluded.provider,
+                    model = excluded.model,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    day,
+                    fingerprint,
+                    briefing.overview,
+                    json.dumps(briefing.highlights, ensure_ascii=False),
+                    briefing.provider,
+                    briefing.model,
+                    now,
+                ),
+            )
 
 
 def _clamp_item(item: NewsItem) -> NewsItem:

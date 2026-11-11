@@ -32,6 +32,8 @@ class Preferences:
     timezone: str = "Asia/Shanghai"
     channels: dict[str, bool] = field(default_factory=dict)
     digest_window_hours: int = 36
+    llm_summaries: bool = True
+    llm_model: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -48,7 +50,26 @@ class Preferences:
             "timezone": self.timezone,
             "channels": dict(self.channels),
             "digest_window_hours": self.digest_window_hours,
+            "llm_summaries": self.llm_summaries,
+            "llm_model": self.llm_model,
         }
+
+
+@dataclass
+class ItemSummary:
+    short: str
+    long: str
+    takeaways: list[str] = field(default_factory=list)
+    provider: str = "extractive"
+    model: str = ""
+
+
+@dataclass
+class Briefing:
+    overview: str
+    highlights: list[str] = field(default_factory=list)
+    provider: str = "extractive"
+    model: str = ""
 
 
 @dataclass

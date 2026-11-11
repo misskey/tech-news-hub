@@ -93,6 +93,24 @@
   </fieldset>
 
   <fieldset>
+    <legend>摘要</legend>
+    <label class="check">
+      <input type="checkbox" name="llm_summaries" value="1" {% if fields.llm_summaries %}checked{% endif %}>
+      <span>
+        <strong>用大模型写中文摘要和今日简报</strong>
+        <small>
+          {% if llm_ready %}已检测到 OPENAI_API_KEY。模型留空时使用 {{ llm_model_default }}。{% else %}还没有 OPENAI_API_KEY，会先用标题和原文摘录，配上密钥后才会调用模型。{% endif %}
+        </small>
+      </span>
+    </label>
+    <label>
+      <span>模型名称</span>
+      <input name="llm_model" value="{{ fields.llm_model }}" placeholder="{{ llm_model_default }}">
+      <small>兼容 OpenAI 的接口。地址用环境变量 OPENAI_BASE_URL，密钥用 OPENAI_API_KEY。这里只保存模型名。</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
     <legend>推送渠道</legend>
     <div class="checks">
       {% for channel in channels %}

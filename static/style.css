@@ -198,7 +198,27 @@ a.title:hover { color: var(--accent); }
 .meta, .summary { margin: 0.25rem 0 0; }
 .meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.7rem; color: var(--muted); font-size: 0.88rem; align-items: center; }
 .badge { padding: 0 0.45rem; font-size: 0.78rem; }
-.summary { color: var(--ink); max-width: 46rem; }
+.summary, .blurb, .detail { color: var(--ink); max-width: 46rem; }
+.blurb { margin: 0.35rem 0 0; }
+.briefing, .story {
+  margin: 1rem 0 1.2rem;
+  padding: 1rem 1.1rem 1.15rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow);
+}
+.briefing h2, .story h2 { font-size: 1.05rem; margin: 0.8rem 0 0.35rem; }
+.briefing p, .briefing ul { margin: 0.35rem 0 0; }
+.briefing ul { padding-left: 1.15rem; }
+.expand { margin-top: 0.45rem; }
+.expand summary { cursor: pointer; color: var(--accent); }
+.expand summary::-webkit-details-marker { color: var(--accent); }
+.expand[open] .when-closed, .expand:not([open]) .when-open { display: none; }
+.expand p { margin: 0.45rem 0 0; }
+.original { color: var(--muted); }
+.more-link { color: var(--accent); }
+.detail { margin-top: 0.6rem; }
 
 .empty, .narrow, .panel, .banner, .form-error {
   background: var(--paper);

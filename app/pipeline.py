@@ -12,6 +12,8 @@ from app.digest import Digest, build_digest
 from app.fetchers import build_fetchers
 from app.ingest import SourceReport, collect, make_client
 from app.notifiers import CHANNELS
+from app.ranking import rank_items
+from app.summary import ensure_briefing, ensure_summaries
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,7 @@ async def fetch_and_store(db: Database, settings: Settings) -> FetchReport:
     async with make_client(settings.fetch_timeout) as client:
         items, sources = await collect(fetchers, client, prefs)
     inserted, updated = db.upsert_items(items)
+    _prepare_reading(db, settings, prefs)
     report = FetchReport(inserted, updated, sources)
     db.add_fetch_run(started, report.to_dict())
     logger.info(report.summary())
@@ -118,7 +121,10 @@ async def push_digest(db: Database, settings: Settings, *, now: datetime | None 
     moment = now or datetime.now(timezone.utc)
     since = moment - timedelta(hours=prefs.digest_window_hours)
     items = db.items_since(since)
-    digest: Digest = build_digest(items, prefs, now=moment)
+    ranked = rank_items(items, prefs)
+    summaries = ensure_summaries(db, [item.item for item in ranked[:20]], prefs, settings, allow_llm=True)
+    briefing = ensure_briefing(db, ranked, summaries, prefs, settings, now=moment, allow_llm=True)
+    digest: Digest = build_digest(items, prefs, now=moment, summaries=summaries, briefing=briefing)
     if not digest.entries:
         report = PushReport(digest.title, 0, note="最近没有可推送的新内容，先抓取一次")
         _remember_push(db, report)
@@ -144,6 +150,17 @@ async def push_digest(db: Database, settings: Settings, *, now: datetime | None 
     _remember_push(db, report)
     logger.info(report.summary())
     return report
+
+
+def _prepare_reading(db: Database, settings: Settings, prefs) -> None:
+    try:
+        moment = datetime.now(timezone.utc)
+        recent = db.items_since(moment - timedelta(hours=prefs.digest_window_hours))
+        ranked = rank_items(recent, prefs)
+        summaries = ensure_summaries(db, [item.item for item in ranked[:20]], prefs, settings, allow_llm=True)
+        ensure_briefing(db, ranked, summaries, prefs, settings, now=moment, allow_llm=True)
+    except Exception:
+        logger.exception("摘要步骤失败，抓取结果已保存")
 
 
 def _remember_push(db: Database, report: PushReport) -> None:

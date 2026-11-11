@@ -49,10 +49,17 @@ def wecom_body(digest: Digest) -> dict:
 
 def feishu_body(digest: Digest, secret: str = "", timestamp: str | None = None) -> dict:
     content = []
+    if digest.overview:
+        content.append([{"tag": "text", "text": digest.overview[:500]}])
+    if digest.highlights:
+        content.append([{"tag": "text", "text": "今日新技术看点：" + "；".join(digest.highlights[:5])}])
     for entry in digest.entries:
+        note = f"  · {entry.source_label} · {entry.score:.0f}"
+        if entry.summary:
+            note += f"。{entry.summary[:80]}"
         line = [
             {"tag": "a", "text": entry.title[:120], "href": entry.url},
-            {"tag": "text", "text": f"  · {entry.source_label} · {entry.score:.0f}"},
+            {"tag": "text", "text": note},
         ]
         content.append(line)
     if not content:

@@ -10,6 +10,21 @@
   </p>
 </section>
 
+{% if briefing %}
+<section class="briefing">
+  <p class="eyebrow">今日技术简报</p>
+  <p>{{ briefing.overview }}</p>
+  {% if briefing.highlights %}
+  <h2>今日新技术看点</h2>
+  <ul>
+    {% for line in briefing.highlights %}
+    <li>{{ line }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}
+
 <div class="toolbar">
   <div class="windows" role="tablist">
     {% for item in windows %}
@@ -64,8 +79,24 @@
         <span>热度 {{ row.popularity }}</span>
         <span>{{ row.time_label }}</span>
         {% for name in row.matched %}<span class="chip tiny">{{ name }}</span>{% endfor %}
+        <span class="chip tiny">{{ row.summary_label }}</span>
       </p>
-      {% if row.summary %}<p class="summary">{{ row.summary }}</p>{% endif %}
+      {% if row.blurb %}<p class="blurb">{{ row.blurb }}</p>{% endif %}
+      {% if row.detail or row.takeaways or row.original %}
+      <details class="expand">
+        <summary><span class="when-closed">展开看点</span><span class="when-open">收起</span></summary>
+        {% if row.detail %}<p>{{ row.detail }}</p>{% endif %}
+        {% if row.takeaways %}
+        <p class="meta">
+          {% for name in row.takeaways %}<span class="chip tiny">{{ name }}</span>{% endfor %}
+        </p>
+        {% endif %}
+        {% if row.original %}<p class="original">原文摘录：{{ row.original }}</p>{% endif %}
+        {% if row.detail_href %}<a class="more-link" href="{{ row.detail_href }}">单独打开</a>{% endif %}
+      </details>
+      {% elif row.detail_href %}
+      <p><a class="more-link" href="{{ row.detail_href }}">单独打开</a></p>
+      {% endif %}
     </div>
   </li>
   {% endfor %}

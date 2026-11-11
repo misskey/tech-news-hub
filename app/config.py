@@ -82,6 +82,9 @@ class Settings:
     wecom_webhook: str
     feishu_webhook: str
     feishu_secret: str
+    openai_api_key: str
+    openai_base_url: str
+    openai_model: str
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -114,6 +117,10 @@ class Settings:
             wecom_webhook=(os.environ.get("WECOM_WEBHOOK") or "").strip(),
             feishu_webhook=(os.environ.get("FEISHU_WEBHOOK") or "").strip(),
             feishu_secret=(os.environ.get("FEISHU_SECRET") or "").strip(),
+            openai_api_key=(os.environ.get("OPENAI_API_KEY") or "").strip(),
+            openai_base_url=(os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").strip()
+            or "https://api.openai.com/v1",
+            openai_model=(os.environ.get("OPENAI_MODEL") or "gpt-4o-mini").strip() or "gpt-4o-mini",
         )
 
 

@@ -104,6 +104,11 @@ def test_login_save_preferences_and_ranked_home(client):
     assert home.status_code == 200
     assert home.text.find("Rust compiler notes") < home.text.find("Email tips")
     assert "校园招聘" not in home.text
+    assert "今日技术简报" in home.text
+    assert "展开看点" in home.text
     filtered = client.get("/?source=hackernews&q=Email")
-    assert "Email tips" in filtered.text
-    assert "Rust compiler notes" not in filtered.text
+    assert ">Email tips</a>" in filtered.text
+    assert ">Rust compiler notes</a>" not in filtered.text
+    detail = client.get("/items/1")
+    assert detail.status_code == 200
+    assert "摘录" in detail.text
