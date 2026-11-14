@@ -13,6 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.templating import Jinja2Templates
 
 from app import __version__
+from app.api import router as client_router
 from app.config import ROOT, Settings, configure_logging
 from app.db import Database
 from app.routes import register
@@ -60,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         https_only=False,
     )
     register(app, TEMPLATES)
+    app.include_router(client_router)
 
     @app.get("/health")
     def health() -> dict:

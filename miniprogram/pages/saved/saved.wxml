@@ -1,0 +1,1 @@
+<view class="page"><view class="title">留给稍后的灵感</view><view class="meta">仅保存在本机，不上传个人数据。</view><view class="state" wx:if="{{!items.length}}">还没有收藏，去早报发现感兴趣的内容吧。</view><view class="card" wx:for="{{items}}" wx:key="id" data-id="{{item.id}}" bindtap="open"><view class="meta">{{item.source_label}}</view><view class="title">{{item.title}}</view></view></view>

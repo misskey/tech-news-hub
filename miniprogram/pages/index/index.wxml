@@ -1,0 +1,7 @@
+<view class="page">
+ <view class="card hero"><view class="eyebrow">TECH DAILY · 科技早报</view><view class="title">每天，读懂技术新变化</view><view>{{date || '今日技术简报'}}</view><view class="body" wx:if="{{briefing && items.length}}">{{briefing.overview}}</view></view>
+ <input placeholder="搜索技术、产品或关键词" value="{{query}}" maxlength="100" bindinput="onSearchInput" bindconfirm="search" confirm-type="search"/><button bindtap="search">搜索</button>
+ <view class="controls"><picker class="control" range="{{windows}}" value="{{windowIndex}}" bindchange="changeWindow">{{windows[windowIndex]}} ▾</picker><picker class="control" range="{{sources}}" range-key="label" value="{{sourceIndex}}" bindchange="changeSource">{{sources[sourceIndex].label}} ▾</picker></view>
+ <view class="card" wx:for="{{items}}" wx:key="id" data-id="{{item.id}}" bindtap="open"><view class="meta">{{item.source_label}}</view><view class="title">{{item.title}}</view><view class="body muted">{{item.short}}</view><view class="tag" wx:for="{{item.takeaways}}" wx:for-item="tag" wx:key="*this">{{tag}}</view></view>
+ <view class="state" wx:if="{{loading}}">正在加载资讯…</view><view class="state" wx:elif="{{error}}">{{error}}<button bindtap="retry">重试</button></view><view class="state" wx:elif="{{!items.length}}">暂无符合条件的资讯，试试切换时间或来源。</view><view class="state" wx:elif="{{!hasMore}}">已读完本次 {{total}} 条资讯</view><view class="meta" wx:if="{{limited}}">当前展示最近 500 条候选资讯中的匹配结果。</view>
+</view>
